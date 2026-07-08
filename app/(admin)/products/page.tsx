@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Product, Category } from '@/lib/types';
 import ProductFormModal from '@/components/products/ProductFormModal';
+import BarcodeLabelModal from '@/components/products/BarcodeLabelModal';
 
 const PAGE_SIZE = 10;
 
@@ -21,6 +22,7 @@ export default function ProductsPage() {
   const [sortAsc, setSortAsc] = useState(true);
   const [loading, setLoading] = useState(true);
   const [modalProduct, setModalProduct] = useState<Product | null | undefined>(undefined);
+  const [labelProduct, setLabelProduct] = useState<Product | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -187,6 +189,12 @@ export default function ProductsPage() {
                   </td>
                   <td className="py-2 text-right space-x-3">
                     <button
+                      onClick={() => setLabelProduct(p)}
+                      className="text-slate-500 text-xs font-medium"
+                    >
+                      Barcode
+                    </button>
+                    <button
                       onClick={() => setModalProduct(p)}
                       className="text-blue-600 text-xs font-medium"
                     >
@@ -236,7 +244,10 @@ export default function ProductsPage() {
           onSaved={loadProducts}
         />
       )}
+
+      {labelProduct && (
+        <BarcodeLabelModal product={labelProduct} onClose={() => setLabelProduct(null)} />
+      )}
     </div>
   );
 }
-
