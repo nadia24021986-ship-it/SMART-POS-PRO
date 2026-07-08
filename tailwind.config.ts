@@ -15,6 +15,14 @@ const config: Config = {
         success: {
           DEFAULT: '#10b981',
         },
+        brand: {
+          orange: '#f59e0b',
+          accent: '#14b8a6',
+          dark: '#0f1420',
+          darker: '#0a0e17',
+          card: '#1a2032',
+          card2: '#212940',
+        },
       },
     },
   },
@@ -22,4 +30,3 @@ const config: Config = {
 };
 
 export default config;
-
