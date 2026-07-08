@@ -1,233 +1,185 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import type { PpobProduct, PpobCategory, PpobTransaction } from '@/lib/types';
+import BottomNav from '@/components/layout/BottomNav';
+import {
+  ShoppingCart,
+  Smartphone,
+  Package,
+  Tags,
+  Boxes,
+  History,
+  BarChart3,
+  Users,
+  Settings,
+  Search,
+  Bell,
+  TrendingUp,
+  ChevronRight,
+} from 'lucide-react';
 
-const CATEGORY_LABEL: Record<PpobCategory, string> = {
-  pulsa: 'Pulsa',
-  token_listrik: 'Token Listrik',
-  paket_data: 'Paket Data',
-  e_wallet: 'E-Wallet',
-  lainnya: 'Lainnya',
-};
+interface MenuTile {
+  label: string;
+  sub: string;
+  icon: React.ElementType;
+  href: string;
+}
 
-export default function PpobPage() {
+// Hanya modul yang benar-benar sudah dibangun.
+const MENU_TILES: MenuTile[] = [
+  { label: 'Penjualan', sub: 'Transaksi POS', icon: ShoppingCart, href: '/pos' },
+  { label: 'Produk Digital', sub: 'Pulsa & token', icon: Smartphone, href: '/ppob' },
+  { label: 'Produk', sub: 'Kelola barang', icon: Package, href: '/products' },
+  { label: 'Kategori', sub: 'Kelompok produk', icon: Tags, href: '/categories' },
+  { label: 'Stok', sub: 'Masuk & keluar', icon: Boxes, href: '/stock' },
+  { label: 'Riwayat', sub: 'Transaksi lalu', icon: History, href: '/sales-history' },
+  { label: 'Laporan', sub: 'Analitik & export', icon: BarChart3, href: '/reports' },
+  { label: 'User', sub: 'Kelola cashier', icon: Users, href: '/users' },
+  { label: 'Pengaturan', sub: 'Toko & printer', icon: Settings, href: '/settings' },
+];
+
+export default function BerandaPage() {
+  const router = useRouter();
   const supabase = createClient();
 
-  const [products, setProducts] = useState<PpobProduct[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<PpobCategory | 'semua'>('semua');
-  const [selectedProduct, setSelectedProduct] = useState<PpobProduct | null>(null);
-  const [customerNumber, setCustomerNumber] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [pendingTx, setPendingTx] = useState<PpobTransaction[]>([]);
-  const [serialInputs, setSerialInputs] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [todaySales, setTodaySales] = useState(0);
+  const [todayTrx, setTodayTrx] = useState(0);
+  const [lowStock, setLowStock] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadProducts();
-    loadPending();
+    loadData();
   }, []);
 
-  async function loadProducts() {
-    const { data } = await supabase
-      .from('ppob_products')
-      .select('*')
-      .eq('is_active', true)
-      .order('category');
-    setProducts(data || []);
-  }
-
-  async function loadPending() {
-    const { data } = await supabase
-      .from('ppob_transactions')
-      .select('*')
-      .in('status', ['pending', 'diproses'])
-      .order('created_at', { ascending: false });
-    setPendingTx(data || []);
-  }
-
-  async function handleCreateTransaction() {
-    setError(null);
-    if (!selectedProduct || !customerNumber.trim()) {
-      setError('Pilih produk dan isi nomor pelanggan/HP.');
-      return;
-    }
-    setSaving(true);
-
+  async function loadData() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const { error: insertError } = await supabase.from('ppob_transactions').insert({
-      ppob_product_id: selectedProduct.id,
-      customer_number: customerNumber.trim(),
-      selling_price: selectedProduct.selling_price,
-      cost_price: selectedProduct.cost_price,
-      status: 'pending',
-      cashier_id: user?.id,
-    });
-
-    setSaving(false);
-
-    if (insertError) {
-      setError('Gagal menyimpan: ' + insertError.message);
-      return;
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
+      if (profile) setFullName(profile.full_name);
     }
 
-    setSelectedProduct(null);
-    setCustomerNumber('');
-    loadPending();
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+
+    const { data: salesData } = await supabase
+      .from('sales')
+      .select('grand_total')
+      .eq('payment_status', 'paid')
+      .gte('created_at', todayStart);
+
+    setTodaySales((salesData || []).reduce((sum, r) => sum + r.grand_total, 0));
+    setTodayTrx((salesData || []).length);
+
+    const { data: productsData } = await supabase
+      .from('products')
+      .select('stock, min_stock')
+      .eq('status', 'active');
+    setLowStock((productsData || []).filter((p) => p.stock <= p.min_stock).length);
+
+    setLoading(false);
   }
 
-  async function handleCompleteTransaction(tx: PpobTransaction) {
-    const code = serialInputs[tx.id]?.trim();
-    if (!code) {
-      alert('Isi kode/token/serial dulu sebelum menyelesaikan transaksi.');
-      return;
+  function goSearch(e: React.FormEvent) {
+    e.preventDefault();
+    if (search.trim()) {
+      router.push(`/products?search=${encodeURIComponent(search.trim())}`);
     }
-    const { error } = await supabase
-      .from('ppob_transactions')
-      .update({ status: 'selesai', serial_code: code, completed_at: new Date().toISOString() })
-      .eq('id', tx.id);
-
-    if (error) {
-      alert('Gagal menyelesaikan: ' + error.message);
-      return;
-    }
-    loadPending();
   }
-
-  async function handleFailTransaction(tx: PpobTransaction) {
-    if (!confirm('Tandai transaksi ini gagal? (misal stok biller habis / nomor salah)')) return;
-    await supabase.from('ppob_transactions').update({ status: 'gagal' }).eq('id', tx.id);
-    loadPending();
-  }
-
-  const filteredProducts =
-    selectedCategory === 'semua' ? products : products.filter((p) => p.category === selectedCategory);
-
-  const groupedByCategory = filteredProducts.reduce<Record<string, PpobProduct[]>>((acc, p) => {
-    acc[p.category] = acc[p.category] || [];
-    acc[p.category].push(p);
-    return acc;
-  }, {});
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-6 space-y-4">
-      <div>
-        <h1 className="text-xl font-bold">Produk Digital (PPOB)</h1>
-        <p className="text-xs text-slate-500 mt-1">
-          Pencatatan manual — kode/token diinput setelah kamu beli dari akun biller pribadi.
-          Belum terhubung ke sistem PLN/operator otomatis.
-        </p>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        {/* Buat transaksi baru */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-4 space-y-3 h-fit">
-          <h2 className="font-semibold text-sm">Transaksi Baru</h2>
-
-          <div className="flex flex-wrap gap-2">
-            {(['semua', 'pulsa', 'token_listrik', 'paket_data', 'e_wallet', 'lainnya'] as const).map((c) => (
-              <button
-                key={c}
-                onClick={() => setSelectedCategory(c)}
-                className={`text-xs px-3 py-1.5 rounded-lg border ${
-                  selectedCategory === c
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'border-slate-300 dark:border-slate-700'
-                }`}
-              >
-                {c === 'semua' ? 'Semua' : CATEGORY_LABEL[c]}
-              </button>
-            ))}
+    <div className="min-h-screen bg-brand-dark text-white pb-24">
+      <div className="max-w-md mx-auto px-4 pt-5 space-y-5">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-slate-400">Selamat datang,</p>
+            <h1 className="font-bold text-lg leading-tight">{fullName || 'Admin'}</h1>
           </div>
-
-          <div className="max-h-64 overflow-y-auto space-y-1">
-            {filteredProducts.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-4">
-                Belum ada produk. Tambahkan dulu di halaman "Kelola Produk Digital".
-              </p>
-            ) : (
-              filteredProducts.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedProduct(p)}
-                  className={`w-full flex justify-between items-center px-3 py-2 rounded-lg text-left text-sm border ${
-                    selectedProduct?.id === p.id
-                      ? 'border-blue-600 bg-blue-50 dark:bg-blue-950'
-                      : 'border-slate-100 dark:border-slate-800'
-                  }`}
-                >
-                  <span>{p.name}</span>
-                  <span className="font-semibold">Rp {p.selling_price.toLocaleString('id-ID')}</span>
-                </button>
-              ))
-            )}
-          </div>
-
-          <input
-            value={customerNumber}
-            onChange={(e) => setCustomerNumber(e.target.value)}
-            placeholder="No. HP / No. Meter Pelanggan"
-            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 text-sm"
-          />
-
-          {error && <p className="text-xs text-red-600">{error}</p>}
-
-          <button
-            onClick={handleCreateTransaction}
-            disabled={saving || !selectedProduct}
-            className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium py-2.5"
-          >
-            {saving ? 'Memproses...' : 'Buat Transaksi (Pending)'}
+          <button className="relative w-10 h-10 rounded-xl bg-brand-card flex items-center justify-center">
+            <Bell size={17} className="text-slate-300" />
+            <span className="absolute top-2 right-2 w-2 h-2 bg-brand-accent rounded-full" />
           </button>
         </div>
 
-        {/* Transaksi pending yang perlu diproses */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-4">
-          <h2 className="font-semibold text-sm mb-3">Menunggu Diproses ({pendingTx.length})</h2>
-          {pendingTx.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-8">Tidak ada transaksi pending.</p>
-          ) : (
-            <div className="space-y-3">
-              {pendingTx.map((tx) => (
-                <div key={tx.id} className="border border-slate-100 dark:border-slate-800 rounded-lg p-3 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-medium">{tx.transaction_number}</span>
-                    <span className="text-emerald-600 font-semibold">
-                      Rp {tx.selling_price.toLocaleString('id-ID')}
-                    </span>
+        {/* Search */}
+        <form onSubmit={goSearch} className="relative">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari produk..."
+            className="w-full bg-brand-card rounded-xl pl-10 pr-4 py-3 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-accent"
+          />
+        </form>
+
+        {/* Hero stat card */}
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="w-full bg-gradient-to-br from-brand-card2 to-brand-card rounded-2xl p-5 text-left relative overflow-hidden"
+        >
+          <div className="flex items-center gap-1.5 text-brand-accent text-xs font-medium mb-1">
+            <TrendingUp size={13} />
+            Penjualan Hari Ini
+          </div>
+          <p className="text-2xl font-bold">
+            {loading ? '...' : `Rp ${todaySales.toLocaleString('id-ID')}`}
+          </p>
+          <div className="flex items-center gap-4 mt-3 text-xs text-slate-400">
+            <span>{todayTrx} transaksi</span>
+            {lowStock > 0 && (
+              <span className="text-amber-400">⚠ {lowStock} produk stok menipis</span>
+            )}
+          </div>
+          <ChevronRight size={16} className="absolute right-4 top-5 text-slate-500" />
+        </button>
+
+        {/* Quick action */}
+        <button
+          onClick={() => router.push('/pos')}
+          className="w-full bg-brand-accent hover:bg-brand-accent/90 rounded-2xl py-3.5 font-semibold text-sm flex items-center justify-center gap-2 transition-colors"
+        >
+          <ShoppingCart size={16} />
+          Mulai Transaksi Baru
+        </button>
+
+        {/* Menu grid */}
+        <div>
+          <p className="text-xs font-medium text-slate-400 mb-2.5 uppercase tracking-wide">Menu</p>
+          <div className="grid grid-cols-3 gap-3">
+            {MENU_TILES.map((tile) => {
+              const Icon = tile.icon;
+              return (
+                <button
+                  key={tile.href}
+                  onClick={() => router.push(tile.href)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-2xl py-4 px-2 text-center bg-brand-card hover:bg-brand-card2 active:scale-95 transition-all"
+                >
+                  <div className="w-11 h-11 rounded-xl bg-white/5 flex items-center justify-center">
+                    <Icon size={19} className="text-brand-accent" />
                   </div>
-                  <p className="text-xs text-slate-500">No: {tx.customer_number}</p>
-                  <input
-                    value={serialInputs[tx.id] || ''}
-                    onChange={(e) => setSerialInputs({ ...serialInputs, [tx.id]: e.target.value })}
-                    placeholder="Input kode/token/serial hasil beli..."
-                    className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-1.5 text-xs"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleCompleteTransaction(tx)}
-                      className="flex-1 rounded-lg bg-emerald-600 text-white text-xs font-medium py-1.5"
-                    >
-                      Selesai
-                    </button>
-                    <button
-                      onClick={() => handleFailTransaction(tx)}
-                      className="flex-1 rounded-lg border border-red-300 text-red-600 text-xs font-medium py-1.5"
-                    >
-                      Gagal
-                    </button>
+                  <div>
+                    <p className="text-xs font-medium leading-tight">{tile.label}</p>
+                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5">{tile.sub}</p>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
+
+      <BottomNav />
     </div>
   );
 }
