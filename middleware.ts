@@ -12,6 +12,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
 const ADMIN_ONLY_PREFIXES = [
+  '/beranda',
   '/dashboard',
   '/products',
   '/categories',
@@ -19,9 +20,10 @@ const ADMIN_ONLY_PREFIXES = [
   '/reports',
   '/users',
   '/settings',
+  '/ppob-produk',
 ];
 
-const SHARED_PREFIXES = ['/pos', '/sales-history'];
+const SHARED_PREFIXES = ['/pos', '/sales-history', '/ppob'];
 
 const PUBLIC_PATHS = ['/login'];
 
