@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import BottomNav from '@/components/layout/BottomNav';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -15,7 +16,6 @@ import {
   Users,
   Settings,
   LogOut,
-  Menu,
   X,
   Smartphone,
 } from 'lucide-react';
@@ -48,12 +48,12 @@ export default function SidebarShell({ children }: { children: React.ReactNode }
 
   const [role, setRole] = useState<'admin' | 'cashier' | null>(null);
   const [fullName, setFullName] = useState('');
-  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const hideSidebar = pathname?.startsWith('/login') || pathname?.startsWith('/beranda');
+  const isLogin = pathname?.startsWith('/login');
+  const isBeranda = pathname?.startsWith('/beranda');
 
   useEffect(() => {
-    if (hideSidebar) return;
+    if (isLogin) return;
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
       const { data: profile } = await supabase
@@ -66,14 +66,18 @@ export default function SidebarShell({ children }: { children: React.ReactNode }
         setFullName(profile.full_name);
       }
     });
-  }, [pathname, hideSidebar]);
+  }, [pathname, isLogin]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push('/login');
   }
 
-  if (hideSidebar) {
+  function goHome() {
+    router.push(role === 'admin' ? '/beranda' : '/pos');
+  }
+
+  if (isLogin) {
     return <>{children}</>;
   }
 
@@ -81,21 +85,19 @@ export default function SidebarShell({ children }: { children: React.ReactNode }
 
   return (
     <div className="flex min-h-screen">
-      {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between px-4 h-14">
-        <span className="font-bold text-blue-700 dark:text-blue-400">Smart POS Pro</span>
-        <button onClick={() => setMobileOpen(!mobileOpen)}>
-          {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-        </button>
-      </div>
+      {/* Mobile top bar — disembunyikan di halaman Beranda karena sudah punya header sendiri */}
+      {!isBeranda && (
+        <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between px-4 h-14">
+          <span className="font-bold text-blue-700 dark:text-blue-400">Smart POS Pro</span>
+          <button onClick={goHome} aria-label="Kembali ke Beranda">
+            <X size={22} />
+          </button>
+        </div>
+      )}
 
-      {/* Sidebar */}
-      <aside
-        className={`fixed md:static top-14 md:top-0 left-0 h-[calc(100vh-3.5rem)] md:h-screen w-64 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 flex flex-col z-30 transition-transform duration-200 ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        }`}
-      >
-        <div className="hidden md:block p-5">
+      {/* Sidebar — hanya tampil di layar desktop (md ke atas) */}
+      <aside className="hidden md:flex md:static top-0 left-0 h-screen w-64 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 flex-col z-30">
+        <div className="p-5">
           <h1 className="font-bold text-lg text-blue-700 dark:text-blue-400">Smart POS Pro</h1>
           {fullName && <p className="text-xs text-slate-500 mt-1">{fullName}</p>}
         </div>
@@ -108,7 +110,6 @@ export default function SidebarShell({ children }: { children: React.ReactNode }
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => setMobileOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   active
                     ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400'
@@ -133,16 +134,13 @@ export default function SidebarShell({ children }: { children: React.ReactNode }
         </div>
       </aside>
 
-      {/* Overlay for mobile */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 z-20 md:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-
       {/* Main content */}
-      <main className="flex-1 pt-14 md:pt-0 min-w-0">{children}</main>
+      <main className={`flex-1 min-w-0 ${isBeranda ? '' : 'pt-14 md:pt-0'} pb-16 md:pb-0`}>
+        {children}
+      </main>
+
+      {/* Bottom nav — mobile only, semua halaman kecuali login */}
+      <BottomNav role={role} />
     </div>
   );
 }
