@@ -1,5 +1,7 @@
 'use client';
 
+import jsPDF from 'jspdf';
+
 interface ReceiptModalProps {
   sale: {
     invoice_number: string;
@@ -20,6 +22,47 @@ interface ReceiptModalProps {
 
 export default function ReceiptModal({ sale, onClose }: ReceiptModalProps) {
   const rupiah = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
+
+  function downloadPDF() {
+    const doc = new jsPDF({ unit: 'mm', format: [80, 150 + sale.items.length * 6] });
+    let y = 10;
+    doc.setFontSize(11);
+    doc.text('Smart POS Pro', 40, y, { align: 'center' });
+    y += 5;
+    doc.setFontSize(8);
+    doc.text(sale.invoice_number, 40, y, { align: 'center' });
+    y += 4;
+    doc.text(new Date(sale.created_at).toLocaleString('id-ID'), 40, y, { align: 'center' });
+    y += 5;
+    doc.line(5, y, 75, y);
+    y += 5;
+
+    sale.items.forEach((item) => {
+      doc.text(`${item.product_name} x${item.qty}`, 5, y);
+      doc.text(rupiah(item.price * item.qty), 75, y, { align: 'right' });
+      y += 5;
+    });
+
+    doc.line(5, y, 75, y);
+    y += 5;
+    doc.text('Subtotal', 5, y);
+    doc.text(rupiah(sale.subtotal), 75, y, { align: 'right' });
+    y += 4;
+    doc.text('Diskon', 5, y);
+    doc.text(rupiah(sale.discount), 75, y, { align: 'right' });
+    y += 4;
+    doc.text('Pajak', 5, y);
+    doc.text(rupiah(sale.tax), 75, y, { align: 'right' });
+    y += 5;
+    doc.setFontSize(10);
+    doc.text('Total', 5, y);
+    doc.text(rupiah(sale.grand_total), 75, y, { align: 'right' });
+    y += 6;
+    doc.setFontSize(8);
+    doc.text('Terima kasih telah berbelanja!', 40, y, { align: 'center' });
+
+    doc.save(`${sale.invoice_number}.pdf`);
+  }
 
   function buildWhatsAppMessage() {
     const lines = [
@@ -104,23 +147,29 @@ export default function ReceiptModal({ sale, onClose }: ReceiptModalProps) {
           <p className="text-center text-xs mt-4">Terima kasih telah berbelanja!</p>
         </div>
 
-        <div className="p-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 print:hidden">
+        <div className="p-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-3 gap-2 print:hidden">
           <button
             onClick={() => window.print()}
-            className="rounded-lg bg-slate-100 dark:bg-slate-800 py-2 text-sm font-medium"
+            className="rounded-lg bg-slate-100 dark:bg-slate-800 py-2 text-xs font-medium"
           >
             Cetak
           </button>
           <button
+            onClick={downloadPDF}
+            className="rounded-lg bg-blue-600 text-white py-2 text-xs font-medium"
+          >
+            PDF
+          </button>
+          <button
             onClick={sendToWhatsApp}
             disabled={!sale.customer_phone}
-            className="rounded-lg bg-emerald-600 disabled:opacity-40 text-white py-2 text-sm font-medium"
+            className="rounded-lg bg-emerald-600 disabled:opacity-40 text-white py-2 text-xs font-medium"
           >
             Kirim WA
           </button>
           <button
             onClick={onClose}
-            className="col-span-2 rounded-lg border border-slate-300 dark:border-slate-700 py-2 text-sm font-medium"
+            className="col-span-3 rounded-lg border border-slate-300 dark:border-slate-700 py-2 text-sm font-medium"
           >
             Tutup & Transaksi Baru
           </button>
@@ -129,4 +178,3 @@ export default function ReceiptModal({ sale, onClose }: ReceiptModalProps) {
     </div>
   );
 }
-
