@@ -57,3 +57,29 @@ export interface Sale {
   created_at: string;
 }
 
+export type PpobCategory = 'pulsa' | 'token_listrik' | 'paket_data' | 'e_wallet' | 'lainnya';
+export type PpobStatus = 'pending' | 'diproses' | 'selesai' | 'gagal';
+
+export interface PpobProduct {
+  id: string;
+  category: PpobCategory;
+  name: string;
+  denomination: number;
+  selling_price: number;
+  cost_price: number;
+  is_active: boolean;
+}
+
+export interface PpobTransaction {
+  id: string;
+  transaction_number: string;
+  ppob_product_id: string;
+  customer_number: string;
+  selling_price: number;
+  cost_price: number;
+  status: PpobStatus;
+  serial_code: string | null;
+  cashier_id: string;
+  created_at: string;
+  completed_at: string | null;
+}
