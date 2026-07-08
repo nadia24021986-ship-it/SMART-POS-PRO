@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Product, CartItem, PaymentMethodType } from '@/lib/types';
 import ReceiptModal from '@/components/pos/ReceiptModal';
+import BarcodeScannerModal from '@/components/pos/BarcodeScannerModal';
 
 export default function POSPage() {
   const supabase = createClient();
@@ -20,6 +21,7 @@ export default function POSPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [completedSale, setCompletedSale] = useState<any>(null);
+  const [showScanner, setShowScanner] = useState(false);
 
   // Load tax percentage from settings once
   useEffect(() => {
@@ -51,6 +53,22 @@ export default function POSPage() {
     }, 250);
     return () => clearTimeout(timeout);
   }, [search]);
+
+  async function handleBarcodeDetected(code: string) {
+    setShowScanner(false);
+    const { data: product } = await supabase
+      .from('products')
+      .select('*')
+      .eq('barcode', code)
+      .eq('status', 'active')
+      .single();
+
+    if (!product) {
+      setError(`Produk dengan barcode "${code}" tidak ditemukan.`);
+      return;
+    }
+    addToCart(product);
+  }
 
   function addToCart(product: Product) {
     if (product.stock <= 0) {
@@ -204,13 +222,22 @@ export default function POSPage() {
         {/* LEFT: Search + Cart */}
         <div className="md:col-span-2 space-y-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-4">
-            <input
-              autoFocus
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari produk / scan barcode..."
-              className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Cari produk / scan barcode (USB/Bluetooth scanner otomatis terbaca di sini)..."
+                className="flex-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowScanner(true)}
+                className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-4 text-sm font-medium whitespace-nowrap"
+              >
+                📷 Scan
+              </button>
+            </div>
             {products.length > 0 && (
               <div className="mt-2 divide-y divide-slate-100 dark:divide-slate-800 border border-slate-100 dark:border-slate-800 rounded-lg overflow-hidden">
                 {products.map((p) => (
@@ -384,7 +411,13 @@ export default function POSPage() {
       {completedSale && (
         <ReceiptModal sale={completedSale} onClose={() => setCompletedSale(null)} />
       )}
+
+      {showScanner && (
+        <BarcodeScannerModal
+          onDetected={handleBarcodeDetected}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
     </div>
   );
 }
-
