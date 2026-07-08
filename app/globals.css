@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Only the receipt content is printed, everything else is hidden */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #receipt-print,
+  #receipt-print * {
+    visibility: visible;
+  }
+  #receipt-print {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}
+
