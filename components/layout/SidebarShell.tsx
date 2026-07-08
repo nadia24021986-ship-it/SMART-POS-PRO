@@ -17,22 +17,27 @@ import {
   LogOut,
   Menu,
   X,
+  Smartphone,
 } from 'lucide-react';
 
 const ADMIN_NAV = [
+  { href: '/beranda', label: 'Beranda', icon: LayoutDashboard },
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/pos', label: 'POS', icon: ShoppingCart },
+  { href: '/ppob', label: 'Produk Digital', icon: Smartphone },
   { href: '/products', label: 'Produk', icon: Package },
   { href: '/categories', label: 'Kategori', icon: Tags },
   { href: '/stock', label: 'Stok', icon: Boxes },
   { href: '/sales-history', label: 'Riwayat Penjualan', icon: History },
   { href: '/reports', label: 'Laporan', icon: BarChart3 },
+  { href: '/ppob-produk', label: 'Kelola Produk Digital', icon: Smartphone },
   { href: '/users', label: 'User', icon: Users },
   { href: '/settings', label: 'Pengaturan', icon: Settings },
 ];
 
 const CASHIER_NAV = [
   { href: '/pos', label: 'POS', icon: ShoppingCart },
+  { href: '/ppob', label: 'Produk Digital', icon: Smartphone },
   { href: '/sales-history', label: 'Riwayat Penjualan', icon: History },
 ];
 
@@ -45,7 +50,7 @@ export default function SidebarShell({ children }: { children: React.ReactNode }
   const [fullName, setFullName] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const hideSidebar = pathname?.startsWith('/login');
+  const hideSidebar = pathname?.startsWith('/login') || pathname?.startsWith('/beranda');
 
   useEffect(() => {
     if (hideSidebar) return;
@@ -141,4 +146,3 @@ export default function SidebarShell({ children }: { children: React.ReactNode }
     </div>
   );
 }
-
