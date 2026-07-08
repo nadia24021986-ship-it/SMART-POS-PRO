@@ -8,14 +8,16 @@
     visibility: hidden;
   }
   #receipt-print,
-  #receipt-print * {
+  #receipt-print *,
+  #barcode-label-print,
+  #barcode-label-print * {
     visibility: visible;
   }
-  #receipt-print {
+  #receipt-print,
+  #barcode-label-print {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
   }
 }
-
